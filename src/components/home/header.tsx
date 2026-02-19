@@ -113,13 +113,13 @@ export default function Header() {
             })}
 
             {/* + dentro del pill */}
-            <button
-              type="button"
+            <Link
+              href="/register"
               className="ml-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/90 transition hover:bg-white/15 hover:text-white"
-              aria-label="Ajouter"
+              aria-label="Registrarse"
             >
               <Plus className="h-4 w-4" />
-            </button>
+            </Link>
           </nav>
 
           {/* CÍRCULO CARRITO */}
@@ -132,13 +132,13 @@ export default function Header() {
           </button>
 
           {/* CÍRCULO USUARIO */}
-          <button
-            type="button"
+          <Link
+            href="/login"
             className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-black/45 text-white/90 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.25)] transition hover:bg-black/55 hover:text-white"
-            aria-label="Compte"
+            aria-label="Iniciar sesión"
           >
             <User className="h-5 w-5" />
-          </button>
+          </Link>
         </div>
 
         {/* MOBILE */}
@@ -204,14 +204,25 @@ export default function Header() {
               )
             })}
 
-            <button
-              type="button"
+            <Link
+              href="/register"
+              onClick={() => setMobileOpen(false)}
               className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 px-3 py-3 text-[14px] font-medium tracking-[0.01em] text-white/90 transition hover:bg-white/15 hover:text-white"
-              aria-label="Ajouter"
+              aria-label="Registrarse"
             >
               <Plus className="h-4 w-4" />
-              Ajouter
-            </button>
+              Registrarse
+            </Link>
+
+            <Link
+              href="/login"
+              onClick={() => setMobileOpen(false)}
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-[14px] font-medium tracking-[0.01em] text-white/90 transition hover:bg-black/55 hover:text-white"
+              aria-label="Iniciar sesión"
+            >
+              <User className="h-4 w-4" />
+              Iniciar sesión
+            </Link>
           </div>
         </div>
       )}
