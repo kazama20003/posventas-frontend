@@ -1,0 +1,13 @@
+<svg width="480" height="320" viewBox="0 0 480 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgBulb" x1="0" y1="0" x2="480" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#EA580C"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="320" rx="28" fill="url(#bgBulb)"/>
+  <path d="M240 72C196.922 72 162 106.922 162 150C162 178.505 177.392 203.415 200.333 216.998C204.49 219.459 207 223.897 207 228.727V234H273V228.727C273 223.897 275.51 219.459 279.667 216.998C302.608 203.415 318 178.505 318 150C318 106.922 283.078 72 240 72Z" fill="white" fill-opacity="0.9"/>
+  <rect x="210" y="234" width="60" height="16" rx="8" fill="#9A3412"/>
+  <rect x="214" y="250" width="52" height="14" rx="7" fill="#7C2D12"/>
+  <text x="28" y="292" fill="white" font-size="26" font-family="Arial, Helvetica, sans-serif" font-weight="700">Foco LED 12W</text>
+</svg>

@@ -1,4 +1,9 @@
+"use client"
+
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { type FormEvent, useMemo, useState } from "react"
+import { getApiErrorMessage, useGoogleAuth, useRegister } from "@/lib/api/auth"
 
 function GoogleMark() {
   return (
@@ -26,7 +31,66 @@ function GoogleMark() {
 const inputClassName =
   "h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
+function toSlug(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+}
+
+function getTenantAppPath(tenantSlug: unknown) {
+  if (typeof tenantSlug === "string" && tenantSlug.length > 0) {
+    return `/app/${tenantSlug}`
+  }
+
+  return "/"
+}
+
 export default function RegisterPage() {
+  const router = useRouter()
+  const { startGoogleAuth } = useGoogleAuth()
+  const registerMutation = useRegister()
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    tenantName: "",
+  })
+
+  const errorMessage = useMemo(() => {
+    if (!registerMutation.error) {
+      return null
+    }
+
+    return getApiErrorMessage(registerMutation.error, "No fue posible crear la cuenta.")
+  }, [registerMutation.error])
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const normalizedTenantName = form.tenantName.trim() || form.name.trim()
+    const normalizedTenantSlug = toSlug(normalizedTenantName)
+
+    registerMutation.mutate(
+      {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        tenantName: normalizedTenantName || undefined,
+        tenantSlug: normalizedTenantSlug || undefined,
+      },
+      {
+        onSuccess: (session) => {
+          router.push(getTenantAppPath(session.tenant.slug))
+        },
+      },
+    )
+  }
+
   return (
     <section className="rounded-3xl border border-border bg-card/95 p-6 shadow-xl shadow-black/5 backdrop-blur sm:p-8">
       <p className="text-center font-serif text-5xl leading-none text-primary">Phoenix</p>
@@ -41,6 +105,7 @@ export default function RegisterPage() {
       <div className="mt-6 space-y-4">
         <button
           type="button"
+          onClick={startGoogleAuth}
           className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-95"
         >
           <GoogleMark />
@@ -53,18 +118,57 @@ export default function RegisterPage() {
           <span className="h-px flex-1 bg-border" />
         </div>
 
-        <div className="space-y-3">
-          <input type="text" placeholder="Name" className={inputClassName} />
-          <input type="email" placeholder="Email" className={inputClassName} />
-          <input type="password" placeholder="Password" className={inputClassName} />
+        <form className="space-y-3" onSubmit={onSubmit}>
+          <input
+            type="text"
+            placeholder="Name"
+            className={inputClassName}
+            value={form.name}
+            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+            autoComplete="name"
+            required
+          />
+          <input
+            type="text"
+            placeholder="Tenant name"
+            className={inputClassName}
+            value={form.tenantName}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                tenantName: event.target.value,
+              }))
+            }
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            className={inputClassName}
+            value={form.email}
+            onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+            autoComplete="email"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            className={inputClassName}
+            value={form.password}
+            onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+            autoComplete="new-password"
+            required
+          />
+
+          {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
 
           <button
-            type="button"
-            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-95"
+            type="submit"
+            disabled={registerMutation.isPending}
+            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:pointer-events-none disabled:opacity-70"
           >
-            Continue with Local
+            {registerMutation.isPending ? "Creating..." : "Continue with Local"}
           </button>
-        </div>
+        </form>
       </div>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">

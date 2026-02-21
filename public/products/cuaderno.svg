@@ -1,0 +1,15 @@
+<svg width="480" height="320" viewBox="0 0 480 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgBook" x1="0" y1="0" x2="480" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14B8A6"/>
+      <stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="320" rx="28" fill="url(#bgBook)"/>
+  <rect x="152" y="62" width="176" height="200" rx="10" fill="white" fill-opacity="0.92"/>
+  <rect x="166" y="62" width="14" height="200" fill="#0F766E"/>
+  <line x1="198" y1="118" x2="302" y2="118" stroke="#14B8A6" stroke-width="6" stroke-linecap="round"/>
+  <line x1="198" y1="150" x2="294" y2="150" stroke="#14B8A6" stroke-width="6" stroke-linecap="round"/>
+  <line x1="198" y1="182" x2="286" y2="182" stroke="#14B8A6" stroke-width="6" stroke-linecap="round"/>
+  <text x="28" y="292" fill="white" font-size="26" font-family="Arial, Helvetica, sans-serif" font-weight="700">Cuaderno Ejecutivo</text>
+</svg>

@@ -1,4 +1,9 @@
+"use client"
+
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { type FormEvent, useState } from "react"
+import { getApiErrorMessage, useGoogleAuth, useLogin } from "@/lib/api/auth"
 
 function GoogleMark() {
   return (
@@ -26,7 +31,36 @@ function GoogleMark() {
 const inputClassName =
   "h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
+function getTenantAppPath(tenantSlug: unknown) {
+  if (typeof tenantSlug === "string" && tenantSlug.length > 0) {
+    return `/app/${tenantSlug}`
+  }
+
+  return "/"
+}
+
 export default function LoginPage() {
+  const router = useRouter()
+  const { startGoogleAuth } = useGoogleAuth()
+  const loginMutation = useLogin()
+  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+  })
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError(null)
+
+    try {
+      const session = await loginMutation.mutateAsync(form)
+      router.push(getTenantAppPath(session.tenant.slug))
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, "No fue posible iniciar sesi\u00f3n."))
+    }
+  }
+
   return (
     <section className="rounded-3xl border border-border bg-card/95 p-6 shadow-xl shadow-black/5 backdrop-blur sm:p-8">
       <p className="text-center font-serif text-5xl leading-none text-primary">Phoenix</p>
@@ -39,6 +73,7 @@ export default function LoginPage() {
       <div className="mt-6 space-y-4">
         <button
           type="button"
+          onClick={startGoogleAuth}
           className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-95"
         >
           <GoogleMark />
@@ -51,17 +86,36 @@ export default function LoginPage() {
           <span className="h-px flex-1 bg-border" />
         </div>
 
-        <div className="space-y-3">
-          <input type="email" placeholder="Email" className={inputClassName} />
-          <input type="password" placeholder="Password" className={inputClassName} />
+        <form className="space-y-3" onSubmit={onSubmit}>
+          <input
+            type="email"
+            placeholder="Email"
+            className={inputClassName}
+            value={form.email}
+            onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+            autoComplete="email"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            className={inputClassName}
+            value={form.password}
+            onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+            autoComplete="current-password"
+            required
+          />
+
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           <button
-            type="button"
-            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-95"
+            type="submit"
+            disabled={loginMutation.isPending}
+            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-95 disabled:pointer-events-none disabled:opacity-70"
           >
-            Continue with Local
+            {loginMutation.isPending ? "Signing in..." : "Continue with Local"}
           </button>
-        </div>
+        </form>
       </div>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">

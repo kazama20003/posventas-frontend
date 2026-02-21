@@ -1,0 +1,13 @@
+<svg width="480" height="320" viewBox="0 0 480 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgBag" x1="0" y1="0" x2="480" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#6D28D9"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="320" rx="28" fill="url(#bgBag)"/>
+  <rect x="170" y="82" width="140" height="172" rx="24" fill="white" fill-opacity="0.92"/>
+  <path d="M204 112C204 92.1177 220.118 76 240 76V76C259.882 76 276 92.1177 276 112V122H204V112Z" fill="#6D28D9"/>
+  <rect x="208" y="150" width="64" height="44" rx="8" fill="#A855F7" fill-opacity="0.35"/>
+  <text x="28" y="292" fill="white" font-size="26" font-family="Arial, Helvetica, sans-serif" font-weight="700">Mochila Urbana</text>
+</svg>

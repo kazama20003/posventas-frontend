@@ -1,0 +1,13 @@
+<svg width="480" height="320" viewBox="0 0 480 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgHead" x1="0" y1="0" x2="480" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="320" rx="28" fill="url(#bgHead)"/>
+  <path d="M160 172V150C160 105.817 195.817 70 240 70V70C284.183 70 320 105.817 320 150V172" stroke="white" stroke-width="18" stroke-linecap="round"/>
+  <rect x="148" y="162" width="36" height="72" rx="14" fill="white" fill-opacity="0.9"/>
+  <rect x="296" y="162" width="36" height="72" rx="14" fill="white" fill-opacity="0.9"/>
+  <text x="28" y="292" fill="white" font-size="26" font-family="Arial, Helvetica, sans-serif" font-weight="700">Audifonos BT</text>
+</svg>

@@ -1,0 +1,13 @@
+<svg width="480" height="320" viewBox="0 0 480 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgCup" x1="0" y1="0" x2="480" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F97316"/>
+      <stop offset="1" stop-color="#C2410C"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="320" rx="28" fill="url(#bgCup)"/>
+  <rect x="176" y="88" width="128" height="158" rx="18" fill="white" fill-opacity="0.92"/>
+  <rect x="208" y="68" width="64" height="22" rx="10" fill="#9A3412"/>
+  <path d="M304 126H328C342.359 126 354 137.641 354 152V152C354 166.359 342.359 178 328 178H304V126Z" fill="white" fill-opacity="0.92"/>
+  <text x="28" y="292" fill="white" font-size="26" font-family="Arial, Helvetica, sans-serif" font-weight="700">Taza Termica 500ml</text>
+</svg>

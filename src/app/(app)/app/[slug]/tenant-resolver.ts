@@ -1,4 +1,4 @@
-import { cache } from "react"
+import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
 
 export type Tenant = {
@@ -45,12 +45,52 @@ const STATIC_TENANTS: Tenant[] = [
   },
 ]
 
-export const getTenantBySlug = cache(async (slug: string): Promise<Tenant | null> => {
-  const normalizedSlug = slug.trim().toLowerCase()
-  return STATIC_TENANTS.find((tenant) => tenant.slug === normalizedSlug) ?? null
-})
+const TENANT_ID_COOKIE_NAME = "posventas_tenant_id"
+const TENANT_SLUG_COOKIE_NAME = "posventas_tenant_slug"
 
-export const requireActiveTenant = cache(async (slug: string): Promise<Tenant> => {
+function normalizeSlug(slug: string) {
+  return slug.trim().toLowerCase()
+}
+
+function formatTenantNameFromSlug(slug: string) {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
+async function resolveTenantFromAuthCookies(slug: string): Promise<Tenant | null> {
+  const cookieStore = await cookies()
+  const cookieSlug = cookieStore.get(TENANT_SLUG_COOKIE_NAME)?.value
+  const cookieTenantId = cookieStore.get(TENANT_ID_COOKIE_NAME)?.value
+
+  if (!cookieSlug || normalizeSlug(cookieSlug) !== normalizeSlug(slug)) {
+    return null
+  }
+
+  return {
+    id: cookieTenantId ?? `tenant_${normalizeSlug(cookieSlug)}`,
+    slug: normalizeSlug(cookieSlug),
+    name: formatTenantNameFromSlug(cookieSlug),
+    plan: "pro",
+    status: "active",
+    city: "Lima",
+  }
+}
+
+export async function getTenantBySlug(slug: string): Promise<Tenant | null> {
+  const normalizedSlug = slug.trim().toLowerCase()
+  const staticTenant = STATIC_TENANTS.find((tenant) => tenant.slug === normalizedSlug) ?? null
+
+  if (staticTenant) {
+    return staticTenant
+  }
+
+  return resolveTenantFromAuthCookies(normalizedSlug)
+}
+
+export async function requireActiveTenant(slug: string): Promise<Tenant> {
   // Reemplazar por DB real:
   // const tenant = await prisma.tenant.findUnique({ where: { slug } })
   const tenant = await getTenantBySlug(slug)
@@ -64,4 +104,4 @@ export const requireActiveTenant = cache(async (slug: string): Promise<Tenant> =
   }
 
   return tenant
-})
+}
