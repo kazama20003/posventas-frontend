@@ -14,6 +14,7 @@ import {
   UserCircle2,
   Users,
   Warehouse,
+  Handshake,
 } from "lucide-react"
 import { useParams, usePathname } from "next/navigation"
 
@@ -128,10 +129,22 @@ const buildMainNavGroups = (
           ],
         },
         {
+          title: "Proveedores",
+          url: route("/suppliers"),
+          icon: Handshake,
+          isActive: isRouteActive(pathname, route("/suppliers")),
+        },
+        {
           title: "Compras",
           url: route("/purchases"),
           icon: Truck,
           isActive: isRouteActive(pathname, route("/purchases")),
+        },
+        {
+          title: "Almacenes",
+          url: route("/warehouses"),
+          icon: Warehouse,
+          isActive: isRouteActive(pathname, route("/warehouses")),
         },
       ],
     },
@@ -154,15 +167,17 @@ const buildMainNavGroups = (
       items: [
         {
           title: "Sucursales",
-          url: route("/tenancy/stores"),
+          url: route("/stores"),
           icon: Building2,
-          isActive: isRouteActive(pathname, route("/tenancy/stores")),
+          isActive: isRouteActive(pathname, route("/stores")),
         },
         {
           title: "Usuarios y roles",
-          url: route("/access/users"),
+          url: route("/users"),
           icon: Users,
-          isActive: isRouteActive(pathname, route("/access/users")),
+          isActive:
+            isRouteActive(pathname, route("/users")) ||
+            isRouteActive(pathname, route("/access/users")),
         },
         {
           title: "Facturacion",
@@ -211,7 +226,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </div>
             <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
               <span className="truncate font-semibold">Phoenix POS</span>
-              <span className="truncate text-xs text-sidebar-foreground/70">{slug ?? "tenant"}</span>
+              <span className="truncate text-xs text-sidebar-foreground/70">
+                {slug ?? "tenant"}
+              </span>
             </div>
           </a>
         </div>
@@ -231,10 +248,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+
       <SidebarContent className="overflow-x-hidden">
         <SidebarSeparator />
         <NavMain groups={navMainGroups} />
       </SidebarContent>
+
       <SidebarFooter>
         <NavUser user={userData.user} />
       </SidebarFooter>
