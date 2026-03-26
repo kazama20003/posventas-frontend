@@ -4,7 +4,6 @@ import * as React from "react"
 import {
   Building2,
   ClipboardList,
-  Command,
   CreditCard,
   LayoutDashboard,
   Package,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react"
 import { useParams, usePathname } from "next/navigation"
 
+import { ActiveStoreSelector } from "./active-store-selector"
 import { NavMain, type NavMainGroup } from "./nav-main"
 import { NavUser } from "./nav-user"
 import {
@@ -91,10 +91,10 @@ const buildMainNavGroups = (
           isActive: isRouteActive(pathname, route("/pos")),
         },
         {
-          title: "Ventas",
-          url: route("/sales"),
+          title: "Pedidos",
+          url: route("/orders"),
           icon: ClipboardList,
-          isActive: isRouteActive(pathname, route("/sales")),
+          isActive: isRouteActive(pathname, route("/orders")),
         },
         {
           title: "Clientes",
@@ -136,9 +136,9 @@ const buildMainNavGroups = (
         },
         {
           title: "Compras",
-          url: route("/purchases"),
+          url: route("/purchase-orders"),
           icon: Truck,
-          isActive: isRouteActive(pathname, route("/purchases")),
+          isActive: isRouteActive(pathname, route("/purchase-orders")),
         },
         {
           title: "Almacenes",
@@ -219,20 +219,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader className="gap-2">
-        <div className="rounded-lg bg-sidebar-accent/20 px-2 py-2">
-          <a href={dashboardUrl} className="flex min-w-0 items-center gap-3">
-            <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-              <Command className="size-4" />
-            </div>
-            <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">Phoenix POS</span>
-              <span className="truncate text-xs text-sidebar-foreground/70">
-                {slug ?? "tenant"}
-              </span>
-            </div>
-          </a>
-        </div>
-
+        <ActiveStoreSelector appLabel="Phoenix POS" tenantLabel={slug ?? "tenant"} />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

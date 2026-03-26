@@ -9,6 +9,7 @@ import {
   Plus,
   RefreshCcw,
   Search,
+  Store,
 } from "lucide-react"
 
 import { useProducts } from "@/lib/api/products"
@@ -18,6 +19,7 @@ import {
   useInventoryMovements,
 } from "@/lib/api/inventories"
 import type { CreateInventoryMovementInput } from "@/lib/api/inventories"
+import { useStores } from "@/lib/api/stores"
 import { useWarehouses } from "@/lib/api/warehouses"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,6 +37,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   formatDate,
+  getStoreLabel,
+  getStoreOptions,
   getVariantOptions,
   getWarehouseLabel,
   uuidV4Pattern,
@@ -45,6 +49,7 @@ type InventoryMovementsPageClientProps = {
 }
 
 type MovementFormValues = {
+  storeId: string
   variantId: string
   warehouseId: string
   delta: string
@@ -57,6 +62,7 @@ type MovementFormErrors = Partial<Record<keyof MovementFormValues, string>>
 const signedIntegerPattern = /^-?\d+$/
 
 const defaultFormValues: MovementFormValues = {
+  storeId: "",
   variantId: "",
   warehouseId: "",
   delta: "",
@@ -202,21 +208,65 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
 
   const movementsQuery = useInventoryMovements()
   const productsQuery = useProducts()
+  const storesQuery = useStores()
   const warehousesQuery = useWarehouses()
   const createMovement = useCreateInventoryMovement()
 
   const movements = useMemo(() => movementsQuery.data ?? [], [movementsQuery.data])
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
+  const stores = useMemo(() => storesQuery.data ?? [], [storesQuery.data])
   const warehouses = useMemo(() => warehousesQuery.data ?? [], [warehousesQuery.data])
   const variantOptions = useMemo(() => getVariantOptions(products), [products])
   const variantsById = useMemo(
     () => new Map(variantOptions.map((variant) => [variant.variantId, variant])),
     [variantOptions]
   )
+  const storesById = useMemo(
+    () => new Map(stores.map((store) => [String(store.id), store])),
+    [stores]
+  )
   const warehousesById = useMemo(
     () => new Map(warehouses.map((warehouse) => [String(warehouse.id), warehouse])),
     [warehouses]
   )
+  const storeOptions = useMemo(() => getStoreOptions(stores, warehouses), [stores, warehouses])
+  const selectedStoreId = useMemo(() => {
+    if (formValues.storeId) {
+      if (storeOptions.length === 0 || storeOptions.some((option) => option.storeId === formValues.storeId)) {
+        return formValues.storeId
+      }
+    }
+
+    return storeOptions.length === 1 ? storeOptions[0]?.storeId ?? "" : ""
+  }, [formValues.storeId, storeOptions])
+  const availableWarehouses = useMemo(() => {
+    if (!selectedStoreId) return []
+
+    return warehouses.filter((warehouse) => String(warehouse.storeId) === selectedStoreId)
+  }, [selectedStoreId, warehouses])
+  const selectedWarehouseId = useMemo(() => {
+    if (formValues.warehouseId) {
+      if (
+        availableWarehouses.length === 0 ||
+        availableWarehouses.some((warehouse) => String(warehouse.id) === formValues.warehouseId)
+      ) {
+        return formValues.warehouseId
+      }
+    }
+
+    return availableWarehouses.length === 1 ? String(availableWarehouses[0]?.id ?? "") : ""
+  }, [availableWarehouses, formValues.warehouseId])
+  const selectedWarehouse = useMemo(
+    () => warehousesById.get(selectedWarehouseId) ?? null,
+    [selectedWarehouseId, warehousesById]
+  )
+  const selectedStore = useMemo(
+    () => storesById.get(selectedStoreId) ?? null,
+    [selectedStoreId, storesById]
+  )
+  const showStoreSelector = storeOptions.length > 1
+  const showWarehouseSelector = availableWarehouses.length > 1
+  const canChooseWarehouse = selectedStoreId.length > 0
 
   const filteredMovements = useMemo(() => {
     const normalized = search.trim().toLowerCase()
@@ -225,17 +275,20 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
     return movements.filter((movement) => {
       const variant = variantsById.get(String(movement.variantId))
       const warehouse = warehousesById.get(String(movement.warehouseId))
+      const store = storesById.get(String(warehouse?.storeId ?? ""))
       return [
         variant?.productName,
         variant?.sku,
         variant?.barcode,
+        store?.name,
+        store?.code,
         warehouse?.name,
         warehouse?.code,
         movement.reason,
         movement.referenceId,
       ].some((value) => String(value ?? "").toLowerCase().includes(normalized))
     })
-  }, [movements, search, variantsById, warehousesById])
+  }, [movements, search, storesById, variantsById, warehousesById])
 
   const entriesCount = movements.filter((movement) => Number(movement.delta) > 0).length
   const exitsCount = movements.filter((movement) => Number(movement.delta) < 0).length
@@ -274,10 +327,29 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
     setActionError(null)
   }
 
+  function handleStoreChange(storeId: string) {
+    setFormValues((current) => ({
+      ...current,
+      storeId,
+      warehouseId: "",
+    }))
+    setFormErrors((current) => ({
+      ...current,
+      warehouseId: undefined,
+    }))
+    setActionError(null)
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const validationErrors = validateMovement(formValues)
+    const normalizedFormValues = {
+      ...formValues,
+      storeId: selectedStoreId,
+      warehouseId: selectedWarehouseId,
+    }
+
+    const validationErrors = validateMovement(normalizedFormValues)
     if (Object.keys(validationErrors).length > 0) {
       setFormErrors(validationErrors)
       return
@@ -286,7 +358,7 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
     setActionError(null)
 
     try {
-      await createMovement.mutateAsync(toCreatePayload(formValues))
+      await createMovement.mutateAsync(toCreatePayload(normalizedFormValues))
       handleSheetOpenChange(false)
     } catch (error) {
       setActionError(getApiErrorMessage(error, "No se pudo registrar el movimiento."))
@@ -306,7 +378,7 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
               <h1 className="text-3xl font-bold tracking-tight text-foreground">Historial de entradas y salidas</h1>
               <p className="max-w-2xl text-sm text-muted-foreground">
                 Registra y revisa movimientos de <span className="font-semibold text-foreground">{slug}</span>
-                , controlando delta por variante, almacen, motivo y referencia.
+                , eligiendo primero la sucursal para filtrar sus almacenes antes de registrar la variante y el delta.
               </p>
             </div>
           </div>
@@ -367,7 +439,7 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <CardTitle>Libro de movimientos</CardTitle>
-                <CardDescription>Entradas, salidas y ajustes por variante y almacen.</CardDescription>
+                <CardDescription>Entradas, salidas y ajustes por sucursal, almacen y variante.</CardDescription>
               </div>
 
               <div className="relative min-w-64">
@@ -376,7 +448,7 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
                   type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar por producto, SKU, almacen o motivo"
+                  placeholder="Buscar por producto, SKU, sucursal, almacen o motivo"
                   className="pl-9"
                 />
               </div>
@@ -417,6 +489,7 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
                   const variant = variantsById.get(String(movement.variantId))
                   const warehouse =
                     warehousesById.get(String(movement.warehouseId)) ?? movement.warehouse ?? undefined
+                  const store = storesById.get(String(warehouse?.storeId ?? ""))
                   const delta = Number(movement.delta ?? 0)
                   const isEntry = delta > 0
 
@@ -442,7 +515,10 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
                             </span>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {variant?.sku ?? "SKU sin resolver"} - {getWarehouseLabel(warehouse)}
+                            {variant?.sku ?? "SKU sin resolver"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {getStoreLabel(store, String(warehouse?.storeId ?? ""))} · {getWarehouseLabel(warehouse)}
                           </p>
                           <p className="text-sm text-foreground">{movement.reason}</p>
                         </div>
@@ -469,7 +545,7 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
           <Card>
             <CardHeader>
               <CardTitle>Resumen operativo</CardTitle>
-              <CardDescription>Lectura rapida de la actividad reciente.</CardDescription>
+              <CardDescription>Lectura rapida de la actividad reciente por sucursal y almacen.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
@@ -519,6 +595,9 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
               ) : (
                 recentMovements.map((movement) => {
                   const variant = variantsById.get(String(movement.variantId))
+                  const warehouse =
+                    warehousesById.get(String(movement.warehouseId)) ?? movement.warehouse ?? undefined
+                  const store = storesById.get(String(warehouse?.storeId ?? ""))
                   const delta = Number(movement.delta ?? 0)
 
                   return (
@@ -534,6 +613,9 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
                           {delta > 0 ? `+${delta}` : delta}
                         </span>
                       </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {getStoreLabel(store, String(warehouse?.storeId ?? ""))} · {getWarehouseLabel(warehouse)}
+                      </p>
                       <p className="mt-1 text-xs text-muted-foreground">{movement.reason}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {formatDate(movement.updatedAt ?? movement.createdAt)}
@@ -552,15 +634,133 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
           <SheetHeader>
             <SheetTitle>Nuevo movimiento</SheetTitle>
             <SheetDescription>
-              Registra una entrada, salida o ajuste usando un delta entero por variante y almacen.
+              Registra una entrada, salida o ajuste siguiendo el flujo sucursal -&gt; almacen -&gt; variante.
             </SheetDescription>
           </SheetHeader>
 
           <form className="flex flex-1 flex-col gap-5 px-4 pb-4" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <label htmlFor="movement-variant" className="text-sm font-medium text-foreground">
-                Variante
-              </label>
+            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <Store className="h-4 w-4" />
+                </div>
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Flujo recomendado
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
+                      1. Selecciona sucursal
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
+                      2. Elige almacen filtrado
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
+                      3. Selecciona variante
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
+                      4. Registra delta y motivo
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Ejemplo: Sucursal Cusco -&gt; Almacen Principal -&gt; Variante Reloj Dorado -&gt; Delta +5.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Field
+              label="Sucursal"
+              htmlFor="movement-store"
+              hint={
+                showStoreSelector
+                  ? "Primero elige la sucursal para filtrar sus almacenes."
+                  : selectedStoreId
+                    ? "Solo hay una sucursal con almacenes disponibles. Se usa automaticamente."
+                    : "No hay sucursales con almacenes disponibles."
+              }
+            >
+              {showStoreSelector ? (
+                <select
+                  id="movement-store"
+                  value={selectedStoreId}
+                  onChange={(event) => handleStoreChange(event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+                >
+                  <option value="">Selecciona una sucursal</option>
+                  {storeOptions.map((store) => (
+                    <option key={store.storeId} value={store.storeId}>
+                      {store.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground">
+                  {selectedStoreId
+                    ? getStoreLabel(selectedStore, selectedStoreId)
+                    : "Sin sucursal disponible"}
+                </div>
+              )}
+            </Field>
+
+            <Field
+              label="Almacen"
+              htmlFor="movement-warehouse"
+              error={formErrors.warehouseId}
+              hint={
+                !canChooseWarehouse
+                  ? "Selecciona una sucursal para ver sus almacenes."
+                  : availableWarehouses.length > 1
+                    ? "Solo veras almacenes de la sucursal elegida."
+                    : availableWarehouses.length === 1
+                      ? "Solo hay un almacen para esta sucursal. Se usa automaticamente."
+                      : "Esta sucursal aun no tiene almacenes configurados."
+              }
+            >
+              {!canChooseWarehouse ? (
+                <div className="rounded-md border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                  Primero selecciona una sucursal.
+                </div>
+              ) : showWarehouseSelector ? (
+                <select
+                  id="movement-warehouse"
+                  value={selectedWarehouseId}
+                  onChange={(event) => handleFieldChange("warehouseId", event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+                  aria-invalid={Boolean(formErrors.warehouseId)}
+                >
+                  <option value="">Selecciona un almacen</option>
+                  {availableWarehouses.map((warehouse) => (
+                    <option key={String(warehouse.id)} value={String(warehouse.id)}>
+                      {getWarehouseLabel(warehouse)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground">
+                  {selectedWarehouse
+                    ? getWarehouseLabel(selectedWarehouse)
+                    : "Sin almacen disponible para esta sucursal"}
+                </div>
+              )}
+              {!formErrors.warehouseId && warehousesQuery.isError ? (
+                <p className="text-xs text-destructive">
+                  {getApiErrorMessage(warehousesQuery.error, "No se pudieron cargar los almacenes.")}
+                </p>
+              ) : null}
+              {!formErrors.warehouseId && storesQuery.isError ? (
+                <p className="text-xs text-destructive">
+                  {getApiErrorMessage(storesQuery.error, "No se pudieron cargar las sucursales.")}
+                </p>
+              ) : null}
+            </Field>
+
+            <Field
+              label="Variante"
+              htmlFor="movement-variant"
+              error={formErrors.variantId}
+              hint="La variante debe existir dentro del catalogo de productos."
+            >
               <select
                 id="movement-variant"
                 value={formValues.variantId}
@@ -575,49 +775,12 @@ export function InventoryMovementsPageClient({ slug }: InventoryMovementsPageCli
                   </option>
                 ))}
               </select>
-              {formErrors.variantId ? (
-                <p className="text-xs text-destructive">{formErrors.variantId}</p>
-              ) : productsQuery.isError ? (
+              {!formErrors.variantId && productsQuery.isError ? (
                 <p className="text-xs text-destructive">
                   {getApiErrorMessage(productsQuery.error, "No se pudieron cargar las variantes.")}
                 </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  La variante debe existir dentro del catalogo de productos.
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="movement-warehouse" className="text-sm font-medium text-foreground">
-                Almacen
-              </label>
-              <select
-                id="movement-warehouse"
-                value={formValues.warehouseId}
-                onChange={(event) => handleFieldChange("warehouseId", event.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
-                aria-invalid={Boolean(formErrors.warehouseId)}
-              >
-                <option value="">Selecciona un almacen</option>
-                {warehouses.map((warehouse) => (
-                  <option key={String(warehouse.id)} value={String(warehouse.id)}>
-                    {getWarehouseLabel(warehouse)}
-                  </option>
-                ))}
-              </select>
-              {formErrors.warehouseId ? (
-                <p className="text-xs text-destructive">{formErrors.warehouseId}</p>
-              ) : warehousesQuery.isError ? (
-                <p className="text-xs text-destructive">
-                  {getApiErrorMessage(warehousesQuery.error, "No se pudieron cargar los almacenes.")}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  El movimiento se aplicara sobre este almacen.
-                </p>
-              )}
-            </div>
+              ) : null}
+            </Field>
 
             <Field
               label="Delta"

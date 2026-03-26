@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/app/sidebar/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TenantContextHydrator } from "@/lib/api/tenant-context-hydrator"
+import { ActiveStoreBootstrap } from "@/lib/app/active-store-context"
 import { TenantBootstrap } from "./tenant-bootstrap"
 
 import { requireActiveTenant } from "./tenant-resolver"
@@ -38,6 +39,7 @@ export default async function DashboardLayout({
         tenantSlug={tenantSlugFromCookie ?? slug}
       />
       <TenantBootstrap />
+      <ActiveStoreBootstrap tenantSlug={slug} />
       <AppSidebar />
       <SidebarInset className="bg-background">
         {children}

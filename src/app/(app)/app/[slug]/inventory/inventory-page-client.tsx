@@ -9,6 +9,7 @@ import {
   RefreshCcw,
   Search,
   ShieldCheck,
+  Store,
   Trash2,
   Warehouse,
 } from "lucide-react"
@@ -26,6 +27,7 @@ import type {
   Inventory,
   UpdateInventoryInput,
 } from "@/lib/api/inventories"
+import { useStores } from "@/lib/api/stores"
 import { useWarehouses } from "@/lib/api/warehouses"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -44,6 +46,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import {
   formatDate,
   getInitials,
+  getStoreLabel,
+  getStoreOptions,
   getVariantOptions,
   getWarehouseLabel,
   uuidV4Pattern,
@@ -54,6 +58,7 @@ type InventoryPageClientProps = {
 }
 
 type InventoryFormValues = {
+  storeId: string
   variantId: string
   warehouseId: string
   quantity: string
@@ -67,6 +72,7 @@ type InventoryFormErrors = Partial<Record<keyof InventoryFormValues, string>>
 const integerPattern = /^\d+$/
 
 const defaultFormValues: InventoryFormValues = {
+  storeId: "",
   variantId: "",
   warehouseId: "",
   quantity: "",
@@ -146,6 +152,7 @@ function toUpdatePayload(values: InventoryFormValues): UpdateInventoryInput {
 
 function getInventoryFormValues(inventory: Inventory): InventoryFormValues {
   return {
+    storeId: "",
     variantId: String(inventory.variantId ?? inventory.variant?.id ?? ""),
     warehouseId: String(inventory.warehouseId ?? inventory.warehouse?.id ?? ""),
     quantity:
@@ -250,6 +257,7 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
 
   const inventoriesQuery = useInventories()
   const productsQuery = useProducts()
+  const storesQuery = useStores()
   const warehousesQuery = useWarehouses()
   const createInventory = useCreateInventory()
   const updateInventory = useUpdateInventory()
@@ -257,16 +265,59 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
 
   const inventories = useMemo(() => inventoriesQuery.data ?? [], [inventoriesQuery.data])
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
+  const stores = useMemo(() => storesQuery.data ?? [], [storesQuery.data])
   const warehouses = useMemo(() => warehousesQuery.data ?? [], [warehousesQuery.data])
   const variantOptions = useMemo(() => getVariantOptions(products), [products])
   const variantsById = useMemo(
     () => new Map(variantOptions.map((variant) => [variant.variantId, variant])),
     [variantOptions]
   )
+  const storesById = useMemo(
+    () => new Map(stores.map((store) => [String(store.id), store])),
+    [stores]
+  )
   const warehousesById = useMemo(
     () => new Map(warehouses.map((warehouse) => [String(warehouse.id), warehouse])),
     [warehouses]
   )
+  const storeOptions = useMemo(() => getStoreOptions(stores, warehouses), [stores, warehouses])
+  const selectedStoreId = useMemo(() => {
+    if (formValues.storeId) {
+      if (storeOptions.length === 0 || storeOptions.some((option) => option.storeId === formValues.storeId)) {
+        return formValues.storeId
+      }
+    }
+
+    return storeOptions.length === 1 ? storeOptions[0]?.storeId ?? "" : ""
+  }, [formValues.storeId, storeOptions])
+  const availableWarehouses = useMemo(() => {
+    if (!selectedStoreId) return []
+
+    return warehouses.filter((warehouse) => String(warehouse.storeId) === selectedStoreId)
+  }, [selectedStoreId, warehouses])
+  const selectedWarehouseId = useMemo(() => {
+    if (formValues.warehouseId) {
+      if (
+        availableWarehouses.length === 0 ||
+        availableWarehouses.some((warehouse) => String(warehouse.id) === formValues.warehouseId)
+      ) {
+        return formValues.warehouseId
+      }
+    }
+
+    return availableWarehouses.length === 1 ? String(availableWarehouses[0]?.id ?? "") : ""
+  }, [availableWarehouses, formValues.warehouseId])
+  const selectedWarehouse = useMemo(
+    () => warehousesById.get(selectedWarehouseId) ?? null,
+    [selectedWarehouseId, warehousesById]
+  )
+  const selectedStore = useMemo(
+    () => storesById.get(selectedStoreId) ?? null,
+    [selectedStoreId, storesById]
+  )
+  const showStoreSelector = storeOptions.length > 1
+  const showWarehouseSelector = availableWarehouses.length > 1
+  const canChooseWarehouse = selectedStoreId.length > 0
 
   const filteredInventories = useMemo(() => {
     const normalized = search.trim().toLowerCase()
@@ -275,17 +326,20 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
     return inventories.filter((inventory) => {
       const variant = variantsById.get(String(inventory.variantId))
       const warehouse = warehousesById.get(String(inventory.warehouseId))
+      const store = storesById.get(String(warehouse?.storeId ?? ""))
       return [
         variant?.productName,
         variant?.sku,
         variant?.barcode,
+        store?.name,
+        store?.code,
         warehouse?.name,
         warehouse?.code,
         inventory.reason,
         inventory.referenceId,
       ].some((value) => String(value ?? "").toLowerCase().includes(normalized))
     })
-  }, [inventories, search, variantsById, warehousesById])
+  }, [inventories, search, storesById, variantsById, warehousesById])
 
   const totalQuantity = inventories.reduce((sum, inventory) => sum + Number(inventory.quantity ?? 0), 0)
   const totalReserved = inventories.reduce((sum, inventory) => sum + Number(inventory.reserved ?? 0), 0)
@@ -323,8 +377,14 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
   }
 
   function openEditSheet(inventory: Inventory) {
+    const warehouseId = String(inventory.warehouseId ?? inventory.warehouse?.id ?? "")
+    const warehouse = warehousesById.get(warehouseId) ?? inventory.warehouse ?? undefined
+
     setEditingInventory(inventory)
-    setFormValues(getInventoryFormValues(inventory))
+    setFormValues({
+      ...getInventoryFormValues(inventory),
+      storeId: String(warehouse?.storeId ?? ""),
+    })
     setFormErrors({})
     setActionError(null)
     setSheetOpen(true)
@@ -336,10 +396,29 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
     setActionError(null)
   }
 
+  function handleStoreChange(storeId: string) {
+    setFormValues((current) => ({
+      ...current,
+      storeId,
+      warehouseId: "",
+    }))
+    setFormErrors((current) => ({
+      ...current,
+      warehouseId: undefined,
+    }))
+    setActionError(null)
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const validationErrors = validateInventory(formValues)
+    const normalizedFormValues = {
+      ...formValues,
+      storeId: selectedStoreId,
+      warehouseId: selectedWarehouseId,
+    }
+
+    const validationErrors = validateInventory(normalizedFormValues)
     if (Object.keys(validationErrors).length > 0) {
       setFormErrors(validationErrors)
       return
@@ -351,10 +430,10 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
       if (editingInventory) {
         await updateInventory.mutateAsync({
           id: editingInventory.id,
-          payload: toUpdatePayload(formValues),
+          payload: toUpdatePayload(normalizedFormValues),
         })
       } else {
-        await createInventory.mutateAsync(toCreatePayload(formValues))
+        await createInventory.mutateAsync(toCreatePayload(normalizedFormValues))
       }
 
       handleSheetOpenChange(false)
@@ -386,10 +465,10 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Modulo de inventario
               </p>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">Stock por variante y almacen</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">Stock por sucursal, almacen y variante</h1>
               <p className="max-w-2xl text-sm text-muted-foreground">
                 Gestiona el inventario de <span className="font-semibold text-foreground">{slug}</span>,
-                vinculando variantes de producto con almacenes y niveles reservados.
+                eligiendo primero la sucursal para filtrar sus almacenes y luego la variante.
               </p>
             </div>
           </div>
@@ -450,7 +529,7 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <CardTitle>Inventario operativo</CardTitle>
-                <CardDescription>Control por variante, almacen, cantidad y reserva.</CardDescription>
+                <CardDescription>Control por sucursal, almacen, variante, cantidad y reserva.</CardDescription>
               </div>
 
               <div className="relative min-w-64">
@@ -459,7 +538,7 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
                   type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar por producto, SKU, almacen o referencia"
+                  placeholder="Buscar por producto, SKU, sucursal, almacen o referencia"
                   className="pl-9"
                 />
               </div>
@@ -500,6 +579,7 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
                   const variant = variantsById.get(String(inventory.variantId))
                   const warehouse =
                     warehousesById.get(String(inventory.warehouseId)) ?? inventory.warehouse ?? undefined
+                  const store = storesById.get(String(warehouse?.storeId ?? ""))
                   const quantity = Number(inventory.quantity ?? 0)
                   const reserved = Number(inventory.reserved ?? 0)
                   const available = quantity - reserved
@@ -519,7 +599,10 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
                               {variant?.productName ?? "Variante no resuelta"}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {variant?.sku ?? inventory.variantId} - {getWarehouseLabel(warehouse)}
+                              {variant?.sku ?? inventory.variantId}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {getStoreLabel(store, String(warehouse?.storeId ?? ""))} · {getWarehouseLabel(warehouse)}
                             </p>
                             <div className="flex flex-wrap items-center gap-2">
                               {variant?.barcode ? (
@@ -608,7 +691,7 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
           <Card>
             <CardHeader>
               <CardTitle>Resumen operativo</CardTitle>
-              <CardDescription>Lectura rapida del estado del stock.</CardDescription>
+              <CardDescription>Lectura rapida del estado del stock por sucursal y almacen.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
@@ -658,6 +741,7 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
                   const variant = variantsById.get(String(inventory.variantId))
                   const warehouse =
                     warehousesById.get(String(inventory.warehouseId)) ?? inventory.warehouse ?? undefined
+                  const store = storesById.get(String(warehouse?.storeId ?? ""))
 
                   return (
                     <div
@@ -670,7 +754,7 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
                             {variant?.productName ?? variant?.sku ?? inventory.variantId}
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {variant?.sku ?? "SKU sin resolver"} - {getWarehouseLabel(warehouse)}
+                            {getStoreLabel(store, String(warehouse?.storeId ?? ""))} · {getWarehouseLabel(warehouse)}
                           </p>
                         </div>
                         <span className="text-xs font-medium text-foreground">
@@ -695,16 +779,134 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
             <SheetTitle>{editingInventory ? "Editar inventario" : "Nuevo inventario"}</SheetTitle>
             <SheetDescription>
               {editingInventory
-                ? "Actualiza variante, almacen, cantidades y datos de seguimiento."
-                : "Registra una nueva relacion de stock entre variante y almacen."}
+                ? "Actualiza sucursal, almacen, variante, cantidades y datos de seguimiento."
+                : "Registra stock siguiendo el flujo sucursal -> almacen -> variante."}
             </SheetDescription>
           </SheetHeader>
 
           <form className="flex flex-1 flex-col gap-5 px-4 pb-4" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <label htmlFor="inventory-variant" className="text-sm font-medium text-foreground">
-                Variante
-              </label>
+            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <Store className="h-4 w-4" />
+                </div>
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Flujo recomendado
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
+                      1. Selecciona sucursal
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
+                      2. Elige almacen filtrado
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
+                      3. Selecciona variante
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm">
+                      4. Define stock y reserva
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Ejemplo: Sucursal Cusco -&gt; Almacen Principal -&gt; Variante Reloj Dorado.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Field
+              label="Sucursal"
+              htmlFor="inventory-store"
+              hint={
+                showStoreSelector
+                  ? "Primero elige la sucursal para filtrar sus almacenes."
+                  : selectedStoreId
+                    ? "Solo hay una sucursal con almacenes disponibles. Se usa automaticamente."
+                    : "No hay sucursales con almacenes disponibles."
+              }
+            >
+              {showStoreSelector ? (
+                <select
+                  id="inventory-store"
+                  value={selectedStoreId}
+                  onChange={(event) => handleStoreChange(event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+                >
+                  <option value="">Selecciona una sucursal</option>
+                  {storeOptions.map((store) => (
+                    <option key={store.storeId} value={store.storeId}>
+                      {store.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground">
+                  {selectedStoreId
+                    ? getStoreLabel(selectedStore, selectedStoreId)
+                    : "Sin sucursal disponible"}
+                </div>
+              )}
+            </Field>
+
+            <Field
+              label="Almacen"
+              htmlFor="inventory-warehouse"
+              error={formErrors.warehouseId}
+              hint={
+                !canChooseWarehouse
+                  ? "Selecciona una sucursal para ver sus almacenes."
+                  : availableWarehouses.length > 1
+                    ? "Solo veras almacenes de la sucursal elegida."
+                    : availableWarehouses.length === 1
+                      ? "Solo hay un almacen para esta sucursal. Se usa automaticamente."
+                      : "Esta sucursal aun no tiene almacenes configurados."
+              }
+            >
+              {!canChooseWarehouse ? (
+                <div className="rounded-md border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                  Primero selecciona una sucursal.
+                </div>
+              ) : showWarehouseSelector ? (
+                <select
+                  id="inventory-warehouse"
+                  value={selectedWarehouseId}
+                  onChange={(event) => handleFieldChange("warehouseId", event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+                  aria-invalid={Boolean(formErrors.warehouseId)}
+                >
+                  <option value="">Selecciona un almacen</option>
+                  {availableWarehouses.map((warehouse) => (
+                    <option key={String(warehouse.id)} value={String(warehouse.id)}>
+                      {getWarehouseLabel(warehouse)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground">
+                  {selectedWarehouse
+                    ? getWarehouseLabel(selectedWarehouse)
+                    : "Sin almacen disponible para esta sucursal"}
+                </div>
+              )}
+              {!formErrors.warehouseId && warehousesQuery.isError ? (
+                <p className="text-xs text-destructive">
+                  {getApiErrorMessage(warehousesQuery.error, "No se pudieron cargar los almacenes.")}
+                </p>
+              ) : null}
+              {!formErrors.warehouseId && storesQuery.isError ? (
+                <p className="text-xs text-destructive">
+                  {getApiErrorMessage(storesQuery.error, "No se pudieron cargar las sucursales.")}
+                </p>
+              ) : null}
+            </Field>
+
+            <Field
+              label="Variante"
+              htmlFor="inventory-variant"
+              error={formErrors.variantId}
+              hint="Se obtiene desde las variantes configuradas en productos."
+            >
               <select
                 id="inventory-variant"
                 value={formValues.variantId}
@@ -719,49 +921,12 @@ export function InventoryPageClient({ slug }: InventoryPageClientProps) {
                   </option>
                 ))}
               </select>
-              {formErrors.variantId ? (
-                <p className="text-xs text-destructive">{formErrors.variantId}</p>
-              ) : productsQuery.isError ? (
+              {!formErrors.variantId && productsQuery.isError ? (
                 <p className="text-xs text-destructive">
                   {getApiErrorMessage(productsQuery.error, "No se pudieron cargar las variantes.")}
                 </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Se obtiene desde las variantes configuradas en productos.
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="inventory-warehouse" className="text-sm font-medium text-foreground">
-                Almacen
-              </label>
-              <select
-                id="inventory-warehouse"
-                value={formValues.warehouseId}
-                onChange={(event) => handleFieldChange("warehouseId", event.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
-                aria-invalid={Boolean(formErrors.warehouseId)}
-              >
-                <option value="">Selecciona un almacen</option>
-                {warehouses.map((warehouse) => (
-                  <option key={String(warehouse.id)} value={String(warehouse.id)}>
-                    {getWarehouseLabel(warehouse)}
-                  </option>
-                ))}
-              </select>
-              {formErrors.warehouseId ? (
-                <p className="text-xs text-destructive">{formErrors.warehouseId}</p>
-              ) : warehousesQuery.isError ? (
-                <p className="text-xs text-destructive">
-                  {getApiErrorMessage(warehousesQuery.error, "No se pudieron cargar los almacenes.")}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Usa el almacen donde realmente existe o se controlara este stock.
-                </p>
-              )}
-            </div>
+              ) : null}
+            </Field>
 
             <div className="grid gap-4 md:grid-cols-2">
               <Field

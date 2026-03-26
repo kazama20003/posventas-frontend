@@ -1,4 +1,5 @@
 import type { Product } from "@/lib/api/products"
+import type { Store } from "@/lib/api/stores"
 import type { Warehouse } from "@/lib/api/warehouses"
 
 export type VariantOption = {
@@ -9,6 +10,12 @@ export type VariantOption = {
   barcode?: string | null
   unitOfMeasure?: string | null
   label: string
+}
+
+export type StoreOption = {
+  storeId: string
+  label: string
+  warehouseCount: number
 }
 
 export const uuidV4Pattern =
@@ -69,4 +76,33 @@ export function getWarehouseLabel(warehouse?: Warehouse | null) {
   if (!warehouse) return "Almacen no resuelto"
   const code = typeof warehouse.code === "string" && warehouse.code.trim().length > 0 ? warehouse.code.trim() : null
   return code ? `${warehouse.name} (${code})` : warehouse.name
+}
+
+export function getStoreLabel(store?: Store | null, fallbackStoreId?: string | null) {
+  if (!store) {
+    return fallbackStoreId ? `Sucursal ${fallbackStoreId}` : "Sucursal no resuelta"
+  }
+
+  const code = typeof store.code === "string" && store.code.trim().length > 0 ? store.code.trim() : null
+  return code ? `${store.name} (${code})` : store.name
+}
+
+export function getStoreOptions(stores: Store[], warehouses: Warehouse[]) {
+  const storeIdsWithWarehouses = new Map<string, number>()
+
+  warehouses.forEach((warehouse) => {
+    const storeId = String(warehouse.storeId ?? "").trim()
+    if (!storeId) return
+    storeIdsWithWarehouses.set(storeId, (storeIdsWithWarehouses.get(storeId) ?? 0) + 1)
+  })
+
+  return Array.from(storeIdsWithWarehouses.entries()).map(([storeId, warehouseCount]) => {
+    const store = stores.find((candidate) => String(candidate.id) === storeId)
+
+    return {
+      storeId,
+      warehouseCount,
+      label: getStoreLabel(store, storeId),
+    }
+  })
 }
