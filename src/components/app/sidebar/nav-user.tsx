@@ -1,5 +1,7 @@
 "use client"
 
+import { useRouter } from "next/navigation"
+import { useState } from "react"
 import {
   BadgeCheck,
   Bell,
@@ -29,6 +31,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { getApiErrorMessage, useLogout } from "@/lib/api/auth"
 
 export function NavUser({
   user,
@@ -40,6 +43,21 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
+  const logoutMutation = useLogout()
+  const [error, setError] = useState<string | null>(null)
+
+  const handleLogout = async () => {
+    setError(null)
+
+    try {
+      await logoutMutation.mutateAsync()
+      router.replace("/login")
+      router.refresh()
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, "No fue posible cerrar sesion."))
+    }
+  }
 
   return (
     <SidebarMenu>
@@ -102,10 +120,15 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={handleLogout}
+              disabled={logoutMutation.isPending}
+              variant="destructive"
+            >
               <LogOut />
-              Log out
+              {logoutMutation.isPending ? "Signing out..." : "Log out"}
             </DropdownMenuItem>
+            {error ? <p className="px-2 py-1 text-xs text-destructive">{error}</p> : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

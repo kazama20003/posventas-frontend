@@ -1,21 +1,19 @@
 import React from "react"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
+
 import { AppSidebar } from "@/components/app/sidebar/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { TenantContextHydrator } from "@/lib/api/tenant-context-hydrator"
 import { ActiveStoreBootstrap } from "@/lib/app/active-store-context"
 import { TenantBootstrap } from "./tenant-bootstrap"
-
 import { requireActiveTenant } from "./tenant-resolver"
-
-const TENANT_ID_COOKIE_NAME = "posventas_tenant_id"
-const TENANT_SLUG_COOKIE_NAME = "posventas_tenant_slug"
 
 type DashboardLayoutProps = {
   children: React.ReactNode
   params: Promise<{ slug: string }>
 }
+
+const TENANT_SLUG_COOKIE_NAME = "posventas_tenant_slug"
 
 export default async function DashboardLayout({
   children,
@@ -23,7 +21,6 @@ export default async function DashboardLayout({
 }: DashboardLayoutProps) {
   const { slug } = await params
   const cookieStore = await cookies()
-  const tenantIdFromCookie = cookieStore.get(TENANT_ID_COOKIE_NAME)?.value ?? null
   const tenantSlugFromCookie = cookieStore.get(TENANT_SLUG_COOKIE_NAME)?.value ?? null
 
   if (tenantSlugFromCookie && tenantSlugFromCookie !== slug) {
@@ -34,13 +31,15 @@ export default async function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <TenantContextHydrator
-        tenantId={tenantIdFromCookie}
-        tenantSlug={tenantSlugFromCookie ?? slug}
+      <TenantBootstrap
+        tenant={{
+          id: tenant.id,
+          slug: tenant.slug,
+          name: tenant.name,
+        }}
       />
-      <TenantBootstrap />
-      <ActiveStoreBootstrap tenantSlug={slug} />
-      <AppSidebar />
+      <ActiveStoreBootstrap tenantSlug={tenant.slug} />
+      <AppSidebar initialTenant={{ slug: tenant.slug, name: tenant.name }} />
       <SidebarInset className="bg-background">
         {children}
         <div className="border-t border-border px-4 py-2">

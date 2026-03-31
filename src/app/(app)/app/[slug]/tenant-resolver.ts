@@ -1,5 +1,6 @@
 import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
+import type { TenantMeResponse } from "@/lib/api/tenants"
 
 export type Tenant = {
   id: string
@@ -7,87 +8,90 @@ export type Tenant = {
   name: string
   plan: "starter" | "pro" | "enterprise"
   status: "active" | "inactive" | "trial"
-  city: string
 }
-
-const STATIC_TENANTS: Tenant[] = [
-  {
-    id: "t_001",
-    slug: "phoenix-store",
-    name: "Phoenix Store",
-    plan: "pro",
-    status: "active",
-    city: "Lima",
-  },
-  {
-    id: "t_002",
-    slug: "demo-market",
-    name: "Demo Market",
-    plan: "starter",
-    status: "trial",
-    city: "Arequipa",
-  },
-  {
-    id: "t_003",
-    slug: "central-shop",
-    name: "Central Shop",
-    plan: "enterprise",
-    status: "active",
-    city: "Cusco",
-  },
-  {
-    id: "t_004",
-    slug: "legacy-store",
-    name: "Legacy Store",
-    plan: "starter",
-    status: "inactive",
-    city: "Trujillo",
-  },
-]
 
 const TENANT_ID_COOKIE_NAME = "posventas_tenant_id"
 const TENANT_SLUG_COOKIE_NAME = "posventas_tenant_slug"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api"
 
 function normalizeSlug(slug: string) {
   return slug.trim().toLowerCase()
 }
 
-function formatTenantNameFromSlug(slug: string) {
-  return slug
-    .split("-")
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase() + part.slice(1))
-    .join(" ")
+function toTenantPlan(plan: string): Tenant["plan"] {
+  switch (plan.trim().toUpperCase()) {
+    case "ENTERPRISE":
+      return "enterprise"
+    case "PRO":
+      return "pro"
+    default:
+      return "starter"
+  }
 }
 
-async function resolveTenantFromAuthCookies(slug: string): Promise<Tenant | null> {
+function toTenantStatus(status: string): Tenant["status"] {
+  switch (status.trim().toUpperCase()) {
+    case "ACTIVE":
+      return "active"
+    case "TRIALING":
+      return "trial"
+    default:
+      return "inactive"
+  }
+}
+
+function serializeCookies(cookieStore: Awaited<ReturnType<typeof cookies>>) {
+  return cookieStore
+    .getAll()
+    .map((cookie) => `${encodeURIComponent(cookie.name)}=${encodeURIComponent(cookie.value)}`)
+    .join("; ")
+}
+
+async function resolveTenantFromBackend(slug: string): Promise<Tenant | null> {
   const cookieStore = await cookies()
   const cookieSlug = cookieStore.get(TENANT_SLUG_COOKIE_NAME)?.value
   const cookieTenantId = cookieStore.get(TENANT_ID_COOKIE_NAME)?.value
 
-  if (!cookieSlug || normalizeSlug(cookieSlug) !== normalizeSlug(slug)) {
+  if (!cookieSlug || !cookieTenantId || normalizeSlug(cookieSlug) !== normalizeSlug(slug)) {
+    return null
+  }
+
+  const headers = new Headers({
+    Accept: "application/json",
+    Cookie: serializeCookies(cookieStore),
+    "x-tenant-id": cookieTenantId,
+    "x-tenant-slug": normalizeSlug(cookieSlug),
+  })
+
+  const response = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/tenants/me`, {
+    method: "GET",
+    headers,
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    return null
+  }
+
+  const tenant = (await response.json()) as TenantMeResponse
+  const resolvedSlug = normalizeSlug(tenant.slug)
+
+  if (!tenant.id || !tenant.name || resolvedSlug !== normalizeSlug(slug)) {
     return null
   }
 
   return {
-    id: cookieTenantId ?? `tenant_${normalizeSlug(cookieSlug)}`,
-    slug: normalizeSlug(cookieSlug),
-    name: formatTenantNameFromSlug(cookieSlug),
-    plan: "pro",
-    status: "active",
-    city: "Lima",
+    id: tenant.id,
+    slug: resolvedSlug,
+    name: tenant.name,
+    plan: toTenantPlan(tenant.subscription?.plan ?? ""),
+    status: toTenantStatus(tenant.subscription?.status ?? ""),
   }
 }
 
 export async function getTenantBySlug(slug: string): Promise<Tenant | null> {
   const normalizedSlug = slug.trim().toLowerCase()
-  const staticTenant = STATIC_TENANTS.find((tenant) => tenant.slug === normalizedSlug) ?? null
-
-  if (staticTenant) {
-    return staticTenant
-  }
-
-  return resolveTenantFromAuthCookies(normalizedSlug)
+  return resolveTenantFromBackend(normalizedSlug)
 }
 
 export async function requireActiveTenant(slug: string): Promise<Tenant> {
@@ -99,7 +103,7 @@ export async function requireActiveTenant(slug: string): Promise<Tenant> {
     notFound()
   }
 
-  if (tenant.status !== "active") {
+  if (tenant.status === "inactive") {
     notFound()
   }
 

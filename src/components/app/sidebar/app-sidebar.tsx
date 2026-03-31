@@ -5,6 +5,7 @@ import {
   Building2,
   ClipboardList,
   CreditCard,
+  Handshake,
   LayoutDashboard,
   Package,
   Settings2,
@@ -13,9 +14,8 @@ import {
   UserCircle2,
   Users,
   Warehouse,
-  Handshake,
 } from "lucide-react"
-import { useParams, usePathname } from "next/navigation"
+import { usePathname } from "next/navigation"
 
 import { ActiveStoreSelector } from "./active-store-selector"
 import { NavMain, type NavMainGroup } from "./nav-main"
@@ -30,9 +30,17 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
+import { useActiveTenant } from "@/lib/app/active-tenant-context"
 
 type BuildRoute = (path: string) => string
 type UserRole = "admin" | "support" | "manager" | "seller"
+
+type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
+  initialTenant: {
+    slug: string
+    name: string
+  }
+}
 
 const userData = {
   user: {
@@ -196,11 +204,11 @@ const buildMainNavGroups = (
   ]
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const params = useParams<{ slug?: string | string[] }>()
+export function AppSidebar({ initialTenant, ...props }: AppSidebarProps) {
   const pathname = usePathname()
-  const rawSlug = params?.slug
-  const slug = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug
+  const { tenantSlug, tenantName } = useActiveTenant()
+  const slug = tenantSlug ?? initialTenant.slug
+  const tenantLabel = tenantName ?? initialTenant.name
   const dashboardUrl = slug ? `/app/${slug}` : "#"
 
   const route = React.useCallback<BuildRoute>(
@@ -219,7 +227,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader className="gap-2">
-        <ActiveStoreSelector appLabel="Phoenix POS" tenantLabel={slug ?? "tenant"} />
+        <ActiveStoreSelector appLabel="Phoenix POS" tenantLabel={tenantLabel} />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

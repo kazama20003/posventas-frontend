@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Instrument_Serif } from "next/font/google"
+import { Bricolage_Grotesque, Instrument_Serif, Inter, Instrument_Sans } from "next/font/google"
 import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider"
+import { cn } from "@/lib/utils";
+
+const instrumentSansHeading = Instrument_Sans({subsets:['latin'],variable:'--font-heading'});
+
+const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -26,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${bricolage.variable} ${instrumentSerif.variable}`}>
+    <html lang="es" className={cn(bricolage.variable, instrumentSerif.variable, "font-sans", inter.variable, instrumentSansHeading.variable)}>
       <body className="font-sans antialiased">
         <QueryProvider>{children}</QueryProvider>
       </body>

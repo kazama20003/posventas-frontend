@@ -1,8 +1,8 @@
 "use client"
 
-import { useTenantMe } from "@/lib/api/tenants"
+import { useActiveTenant } from "@/lib/app/active-tenant-context"
 
-function formatDate(value: string | null) {
+function formatDate(value: string | null | undefined) {
   if (!value) {
     return "Sin fecha"
   }
@@ -19,10 +19,9 @@ function formatDate(value: string | null) {
 }
 
 export function TenantLiveSummary() {
-  const tenantQuery = useTenantMe()
-  const tenant = tenantQuery.data
+  const { tenant, isLoading, isError } = useActiveTenant()
 
-  if (tenantQuery.isLoading) {
+  if (isLoading) {
     return (
       <section className="rounded-lg border border-border bg-card p-4">
         <p className="text-sm text-muted-foreground">Cargando tenant...</p>
@@ -30,7 +29,7 @@ export function TenantLiveSummary() {
     )
   }
 
-  if (tenantQuery.isError || !tenant) {
+  if (isError || !tenant) {
     return (
       <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
         <p className="text-sm text-destructive">
@@ -50,16 +49,18 @@ export function TenantLiveSummary() {
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Plan</p>
-          <p className="font-semibold text-foreground">{tenant.subscription.plan}</p>
+          <p className="font-semibold text-foreground">{tenant.subscription?.plan ?? "Sin plan"}</p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Estado</p>
-          <p className="font-semibold text-foreground">{tenant.subscription.status}</p>
+          <p className="font-semibold text-foreground">{tenant.subscription?.status ?? "Sin estado"}</p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Renovacion/Trial</p>
           <p className="font-semibold text-foreground">
-            {formatDate(tenant.subscription.currentPeriodEnd ?? tenant.subscription.trialEndsAt)}
+            {formatDate(
+              tenant.subscription?.currentPeriodEnd ?? tenant.subscription?.trialEndsAt ?? null
+            )}
           </p>
         </div>
       </div>

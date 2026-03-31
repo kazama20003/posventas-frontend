@@ -1,10 +1,19 @@
+import { createStore } from "zustand/vanilla"
+
 const TENANT_STORAGE_KEY = "posventas_tenant_id"
 const TENANT_COOKIE_NAME = "posventas_tenant_id"
 const TENANT_SLUG_STORAGE_KEY = "posventas_tenant_slug"
 const TENANT_SLUG_COOKIE_NAME = "posventas_tenant_slug"
 
-let tenantIdState: string | null = null
-let tenantSlugState: string | null = null
+type TenantContextState = {
+  tenantId: string | null
+  tenantSlug: string | null
+}
+
+const tenantContextStore = createStore<TenantContextState>(() => ({
+  tenantId: null,
+  tenantSlug: null,
+}))
 
 function parseCookieValue(name: string) {
   if (typeof document === "undefined") {
@@ -26,7 +35,7 @@ function parseCookieValue(name: string) {
 }
 
 export function setTenantId(tenantId: string | null) {
-  tenantIdState = tenantId
+  tenantContextStore.setState({ tenantId })
 
   if (typeof window === "undefined") {
     return
@@ -42,8 +51,10 @@ export function setTenantId(tenantId: string | null) {
 }
 
 export function getTenantId() {
-  if (tenantIdState) {
-    return tenantIdState
+  const currentTenantId = tenantContextStore.getState().tenantId
+
+  if (currentTenantId) {
+    return currentTenantId
   }
 
   if (typeof window === "undefined") {
@@ -52,13 +63,13 @@ export function getTenantId() {
 
   const fromStorage = window.localStorage.getItem(TENANT_STORAGE_KEY)
   if (fromStorage) {
-    tenantIdState = fromStorage
+    tenantContextStore.setState({ tenantId: fromStorage })
     return fromStorage
   }
 
   const fromCookie = parseCookieValue(TENANT_COOKIE_NAME)
   if (fromCookie) {
-    tenantIdState = fromCookie
+    tenantContextStore.setState({ tenantId: fromCookie })
     window.localStorage.setItem(TENANT_STORAGE_KEY, fromCookie)
     return fromCookie
   }
@@ -71,7 +82,7 @@ export function clearTenantId() {
 }
 
 export function setTenantSlug(tenantSlug: string | null) {
-  tenantSlugState = tenantSlug
+  tenantContextStore.setState({ tenantSlug })
 
   if (typeof window === "undefined") {
     return
@@ -87,8 +98,10 @@ export function setTenantSlug(tenantSlug: string | null) {
 }
 
 export function getTenantSlug() {
-  if (tenantSlugState) {
-    return tenantSlugState
+  const currentTenantSlug = tenantContextStore.getState().tenantSlug
+
+  if (currentTenantSlug) {
+    return currentTenantSlug
   }
 
   if (typeof window === "undefined") {
@@ -97,13 +110,13 @@ export function getTenantSlug() {
 
   const fromStorage = window.localStorage.getItem(TENANT_SLUG_STORAGE_KEY)
   if (fromStorage) {
-    tenantSlugState = fromStorage
+    tenantContextStore.setState({ tenantSlug: fromStorage })
     return fromStorage
   }
 
   const fromCookie = parseCookieValue(TENANT_SLUG_COOKIE_NAME)
   if (fromCookie) {
-    tenantSlugState = fromCookie
+    tenantContextStore.setState({ tenantSlug: fromCookie })
     window.localStorage.setItem(TENANT_SLUG_STORAGE_KEY, fromCookie)
     return fromCookie
   }
