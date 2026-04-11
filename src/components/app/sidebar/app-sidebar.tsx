@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import {
+  Banknote,
   Building2,
   ClipboardList,
   CreditCard,
@@ -30,6 +31,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
+import { useAuthMe } from "@/lib/api/auth"
 import { useActiveTenant } from "@/lib/app/active-tenant-context"
 
 type BuildRoute = (path: string) => string
@@ -42,13 +44,48 @@ type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   }
 }
 
-const userData = {
-  user: {
-    name: "Usuario Demo",
-    email: "usuario@phoenix.com",
-    avatar: "",
-    role: "admin" as UserRole,
-  },
+function readStringField(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim()
+    }
+  }
+
+  return null
+}
+
+function getNameFromEmail(email: string | null) {
+  if (!email) {
+    return null
+  }
+
+  const localPart = email.split("@")[0]?.trim()
+  if (!localPart) {
+    return null
+  }
+
+  return localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
+function normalizeRole(value: string | null): UserRole {
+  switch (value?.trim().toUpperCase()) {
+    case "SUPPORT":
+      return "support"
+    case "MANAGER":
+      return "manager"
+    case "SELLER":
+    case "CASHIER":
+      return "seller"
+    case "OWNER":
+    case "ADMIN":
+    default:
+      return "admin"
+  }
 }
 
 const isRouteActive = (pathname: string | null, url: string) => {
@@ -92,6 +129,12 @@ const buildMainNavGroups = (
     {
       label: "Ventas",
       items: [
+        {
+          title: "Caja",
+          url: route("/cash"),
+          icon: Banknote,
+          isActive: isRouteActive(pathname, route("/cash")),
+        },
         {
           title: "Punto de venta",
           url: route("/pos"),
@@ -206,10 +249,31 @@ const buildMainNavGroups = (
 
 export function AppSidebar({ initialTenant, ...props }: AppSidebarProps) {
   const pathname = usePathname()
+  const authQuery = useAuthMe()
   const { tenantSlug, tenantName } = useActiveTenant()
   const slug = tenantSlug ?? initialTenant.slug
   const tenantLabel = tenantName ?? initialTenant.name
   const dashboardUrl = slug ? `/app/${slug}` : "#"
+  const currentUser = React.useMemo(() => {
+    const payload = authQuery.data && typeof authQuery.data === "object"
+      ? (authQuery.data as Record<string, unknown>)
+      : {}
+    const email = readStringField(payload, ["email"])
+    const name =
+      readStringField(payload, ["name", "displayName", "fullName", "username"]) ??
+      getNameFromEmail(email) ??
+      "Mi cuenta"
+    const avatar =
+      readStringField(payload, ["avatar", "avatarUrl", "picture", "image", "photoUrl"]) ?? ""
+    const role = normalizeRole(readStringField(payload, ["role", "userRole"]))
+
+    return {
+      name,
+      email: email ?? "",
+      avatar,
+      role,
+    }
+  }, [authQuery.data])
 
   const route = React.useCallback<BuildRoute>(
     (path) => {
@@ -220,8 +284,8 @@ export function AppSidebar({ initialTenant, ...props }: AppSidebarProps) {
   )
 
   const navMainGroups = React.useMemo(
-    () => buildMainNavGroups(route, userData.user.role, pathname),
-    [route, pathname]
+    () => buildMainNavGroups(route, currentUser.role, pathname),
+    [currentUser.role, route, pathname]
   )
 
   return (
@@ -250,7 +314,7 @@ export function AppSidebar({ initialTenant, ...props }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
-        <NavUser user={userData.user} />
+        <NavUser user={currentUser} />
       </SidebarFooter>
     </Sidebar>
   )

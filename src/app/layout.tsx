@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Instrument_Serif, Inter, Instrument_Sans } from "next/font/google"
+import { Bricolage_Grotesque, Figtree, Instrument_Serif, Inter } from "next/font/google"
 import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider"
 import { cn } from "@/lib/utils";
 
-const instrumentSansHeading = Instrument_Sans({subsets:['latin'],variable:'--font-heading'});
+const figtreeHeading = Figtree({ subsets: ["latin"], variable: "--font-heading", display: "swap" });
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -31,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={cn(bricolage.variable, instrumentSerif.variable, "font-sans", inter.variable, instrumentSansHeading.variable)}>
+    <html lang="es" className={cn(bricolage.variable, instrumentSerif.variable, "font-sans", inter.variable, figtreeHeading.variable)}>
       <body className="font-sans antialiased">
         <QueryProvider>{children}</QueryProvider>
       </body>

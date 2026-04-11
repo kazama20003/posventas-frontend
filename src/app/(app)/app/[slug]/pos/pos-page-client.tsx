@@ -43,6 +43,7 @@ type PosItem = {
   sku: string
   unitOfMeasure?: string | null
   price: number
+  imageUrl?: string | null
 }
 
 type CartItem = {
@@ -89,6 +90,21 @@ function getOrderCode(order: Order) {
   return order.code?.trim() ? order.code : `OV-${String(order.id).slice(0, 8)}`
 }
 
+function getPrimaryImageUrl(images: unknown) {
+  if (!Array.isArray(images)) return null
+
+  const image = images.find(
+    (entry) =>
+      typeof entry === "object" &&
+      entry !== null &&
+      "url" in entry &&
+      typeof entry.url === "string" &&
+      entry.url.trim().length > 0
+  ) as { url?: string } | undefined
+
+  return image?.url ?? null
+}
+
 function buildPosItems(products: Array<Record<string, unknown>>) {
   return products.flatMap((product) => {
     const categoryValue =
@@ -114,6 +130,7 @@ function buildPosItems(products: Array<Record<string, unknown>>) {
         unitOfMeasure:
           typeof variant.unitOfMeasure === "string" ? variant.unitOfMeasure : null,
         price,
+        imageUrl: getPrimaryImageUrl(product.images),
       }))
   })
 }
@@ -285,35 +302,25 @@ export function PosPageClient({ slug }: PosPageClientProps) {
   }
 
   return (
-    <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
-      <header className="rounded-lg border border-border bg-card p-6">
+    <main className="flex min-w-0 flex-1 flex-col gap-5 bg-background p-2 sm:p-3 lg:p-4">
+      <header className="rounded-md border border-border bg-card p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <SidebarTrigger />
-              <Separator orientation="vertical" className="h-4" />
-              <span>Tenant {slug}</span>
-            </div>
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+          <div className="flex items-start gap-3">
+            <SidebarTrigger className="mt-1 size-9 shrink-0 rounded-md border border-border bg-background text-muted-foreground shadow-none" />
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Gestion comercial
+              </p>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                 Punto de venta
               </h1>
-              <p className="text-sm text-muted-foreground">
-                Pantalla operativa para buscar productos, armar carrito y registrar ventas.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Sucursal activa:{" "}
-                <span className="font-medium text-foreground">
-                  {selectedStore?.name ?? "Selecciona una sucursal desde la barra lateral"}
-                </span>
-              </p>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <Button
               variant="outline"
-              className="gap-2"
+              className="h-9 gap-2"
               onClick={() => {
                 void productsQuery.refetch()
                 void ordersQuery.refetch()
@@ -325,7 +332,7 @@ export function PosPageClient({ slug }: PosPageClientProps) {
               />
               Actualizar
             </Button>
-            <Button asChild variant="outline" className="gap-2">
+            <Button asChild variant="outline" className="h-9 gap-2">
               <Link href={`/app/${slug}/orders`}>
                 <ShoppingCart className="h-4 w-4" />
                 Ver ventas
@@ -335,36 +342,9 @@ export function PosPageClient({ slug }: PosPageClientProps) {
         </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Productos listos
-            </p>
-            <p className="mt-2 text-3xl font-bold text-foreground">{posItems.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Carrito actual
-            </p>
-            <p className="mt-2 text-3xl font-bold text-foreground">{cart.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Total a cobrar
-            </p>
-            <p className="mt-2 text-3xl font-bold text-foreground">{formatCurrency(total)}</p>
-          </CardContent>
-        </Card>
-      </section>
-
       <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_420px]">
-        <Card>
-          <CardHeader className="space-y-3">
+        <Card className="overflow-hidden border-border bg-card shadow-none">
+          <CardHeader className="space-y-3 border-b border-border">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <CardTitle>Catalogo para venta</CardTitle>
@@ -392,8 +372,8 @@ export function PosPageClient({ slug }: PosPageClientProps) {
                   onClick={() => setSelectedCategory(category)}
                   className={
                     category === selectedCategory
-                      ? "rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
-                      : "rounded-full border border-border bg-background px-3 py-1 text-xs font-medium"
+                      ? "rounded-md border border-border bg-background px-3 py-1 text-xs font-semibold text-foreground shadow-xs"
+                      : "rounded-md border border-transparent bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
                   }
                 >
                   {category}
@@ -402,11 +382,11 @@ export function PosPageClient({ slug }: PosPageClientProps) {
             </div>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="p-4">
             {isLoading ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, index) => (
-                  <Card key={index} className="border-border/60">
+                  <Card key={index} className="border-border bg-background shadow-none">
                     <CardContent className="space-y-3 p-4">
                       <Skeleton className="h-5 w-32" />
                       <Skeleton className="h-4 w-24" />
@@ -427,24 +407,48 @@ export function PosPageClient({ slug }: PosPageClientProps) {
                 {filteredItems.map((item) => (
                   <div
                     key={item.variantId}
-                    className="rounded-lg border border-border/70 bg-gradient-to-br from-card to-card/95 p-4 dark:from-card/80 dark:to-card"
+                    className="overflow-hidden rounded-md border border-border bg-background p-3 shadow-none transition-colors hover:bg-muted/20"
                   >
-                    <div className="space-y-2">
-                      <div className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                        {item.category}
+                    <div className="space-y-3">
+                      <div className="aspect-[4/3] overflow-hidden rounded-md border border-border bg-muted/30">
+                        {item.imageUrl ? (
+                          <div
+                            className="h-full w-full bg-cover bg-center"
+                            style={{ backgroundImage: `url("${item.imageUrl}")` }}
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-muted-foreground">
+                            <Package className="h-8 w-8" />
+                          </div>
+                        )}
                       </div>
-                      <h3 className="font-semibold text-foreground">{item.productName}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        SKU {item.sku}
-                        {item.unitOfMeasure ? ` · ${item.unitOfMeasure}` : ""}
-                      </p>
+
+                      <div className="space-y-2">
+                        <div className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          {item.category}
+                        </div>
+                        <h3 className="line-clamp-2 min-h-[2.5rem] font-semibold text-foreground">
+                          {item.productName}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          SKU {item.sku}
+                          {item.unitOfMeasure ? ` | ${item.unitOfMeasure}` : ""}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="mt-4 flex items-center justify-between gap-3">
-                      <p className="text-lg font-bold text-foreground">
-                        {formatCurrency(item.price)}
-                      </p>
-                      <Button size="sm" className="gap-1.5" onClick={() => addToCart(item)}>
+                      <div>
+                        <p className="text-lg font-semibold text-foreground">
+                          {formatCurrency(item.price)}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">Precio unitario</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="gap-1.5 rounded-md"
+                        onClick={() => addToCart(item)}
+                      >
                         <Plus className="h-3.5 w-3.5" />
                         Agregar
                       </Button>
@@ -457,7 +461,7 @@ export function PosPageClient({ slug }: PosPageClientProps) {
         </Card>
 
         <div className="space-y-4">
-          <Card>
+          <Card className="border-border bg-card shadow-none">
             <CardHeader>
               <CardTitle className="inline-flex items-center gap-2">
                 <ShoppingCart className="h-4 w-4" />
@@ -468,7 +472,7 @@ export function PosPageClient({ slug }: PosPageClientProps) {
 
             <CardContent className="space-y-4">
               <div className="grid gap-3">
-                <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-3">
+                <div className="rounded-md border border-dashed border-border/70 bg-muted/20 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Sucursal activa
                   </p>
@@ -517,12 +521,12 @@ export function PosPageClient({ slug }: PosPageClientProps) {
 
               <div className="space-y-3">
                 {cart.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/70 p-3 text-sm text-muted-foreground">
+                    <div className="rounded-md border border-dashed border-border/70 p-3 text-sm text-muted-foreground">
                     El carrito esta vacio. Agrega productos desde el catalogo.
                   </div>
                 ) : (
                   cart.map((item) => (
-                    <div key={item.variantId} className="rounded-lg border border-border/70 p-3">
+                      <div key={item.variantId} className="rounded-md border border-border bg-background p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold text-foreground">{item.productName}</p>
@@ -623,7 +627,7 @@ export function PosPageClient({ slug }: PosPageClientProps) {
               ) : null}
 
               <Button
-                className="w-full"
+                className="w-full rounded-md"
                 disabled={createOrder.isPending}
                 onClick={() => void submitSale("charge")}
               >
@@ -631,7 +635,7 @@ export function PosPageClient({ slug }: PosPageClientProps) {
               </Button>
               <Button
                 variant="outline"
-                className="w-full"
+                className="w-full rounded-md"
                 disabled={createOrder.isPending}
                 onClick={() => void submitSale("pending")}
               >
@@ -640,7 +644,7 @@ export function PosPageClient({ slug }: PosPageClientProps) {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-border bg-card shadow-none">
             <CardHeader>
               <CardTitle>Ventas recientes</CardTitle>
               <CardDescription>Ultimas ventas registradas desde el sistema.</CardDescription>
@@ -648,20 +652,20 @@ export function PosPageClient({ slug }: PosPageClientProps) {
             <CardContent className="space-y-3">
               {ordersQuery.isLoading ? (
                 Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="space-y-2 rounded-lg border border-border/70 p-3">
+                  <div key={index} className="space-y-2 rounded-md border border-border bg-background p-3">
                     <Skeleton className="h-4 w-28" />
                     <Skeleton className="h-4 w-36" />
                   </div>
                 ))
               ) : recentOrders.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border/70 p-3 text-sm text-muted-foreground">
+                <div className="rounded-md border border-dashed border-border/70 p-3 text-sm text-muted-foreground">
                   Aun no hay ventas registradas.
                 </div>
               ) : (
                 recentOrders.map((order) => (
                   <div
                     key={String(order.id)}
-                    className="rounded-lg border border-border/70 p-3"
+                    className="rounded-md border border-border bg-background p-3"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -694,3 +698,4 @@ export function PosPageClient({ slug }: PosPageClientProps) {
     </main>
   )
 }
+

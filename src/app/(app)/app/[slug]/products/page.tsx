@@ -5,7 +5,7 @@ type ProductsPageProps = {
 }
 
 export default async function ProductsPage({ params }: ProductsPageProps) {
-  const { slug } = await params
+  await params
 
-  return <ProductsPageClient slug={slug} />
+  return <ProductsPageClient />
 }
